@@ -40,25 +40,12 @@ ssh ${GRAFANA_HOST} "rm -rf ${TEMP_DIR} && mkdir -p ${TEMP_DIR}"
 # Copy built frontend files to temp directory
 scp -r ${LOCAL_DIST_DIR}/* ${GRAFANA_HOST}:${TEMP_DIR}/
 
-# Copy Go source code for remote compilation
-echo "📁 Copying Go source code..."
-scp -r pkg/ go.mod ${GRAFANA_HOST}:${TEMP_DIR}/
+# Note: Plugin is frontend-only, no Go compilation needed
 
 echo "🚀 Deploying plugin to Grafana..."
 ssh ${GRAFANA_HOST} << EOF
-# Build Go backend on remote server
-echo "⚙️ Building Go backend on remote server..."
-cd ${TEMP_DIR}
-if command -v go >/dev/null 2>&1; then
-    echo "   ✅ Go found, building backend..."
-    cd pkg
-    go build -o ../gpx_solar-forecast-datasource_linux_amd64 .
-    cd ..
-    echo "   ✅ Backend compiled successfully"
-else
-    echo "   ⚠️  Go not found on remote server - backend functionality will not be available"
-    echo "   ℹ️  Plugin will continue with frontend-only functionality"
-fi
+# Frontend-only plugin - no Go backend compilation needed
+echo "⚙️ Deploying frontend-only plugin..."
 
 # Stop Grafana first to avoid file locks
 sudo systemctl stop grafana-server
