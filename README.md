@@ -1,3 +1,12 @@
+#Warning: 
+
+this has been created as part of testing AI driven (not even AI assisted) coding. 
+I have not written nor modified any of the code included, so I don't take any responsibility for it's fitnes
+
+Id does work in my setup, though and does what I want it to do.
+
+You have been warned!
+
 # Solar Forecast Grafana Data Source Plugin
 
 A powerful Grafana data source plugin for solar power forecasting, supporting both **Forecast.Solar** and **Solcast** APIs.
