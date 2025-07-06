@@ -188,9 +188,6 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## 📞 Support
 
 - 🐛 **Issues**: [GitHub Issues](https://github.com/your-repo/solar-forecast-datasource/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/your-repo/solar-forecast-datasource/discussions)
-- 📚 **Documentation**: [Wiki](https://github.com/your-repo/solar-forecast-datasource/wiki)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/pljakobs/solar-forecast-datasource/discussions)
 
 ---
-
-**Made with ☀️ for the solar community**
