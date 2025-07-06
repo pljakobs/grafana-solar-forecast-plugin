@@ -18,6 +18,7 @@ A powerful Grafana data source plugin for solar power forecasting, supporting bo
 ## ✨ Features
 
 - 🌞 **Dual API Support**: Compatible with both Forecast.Solar (free/paid) and Solcast APIs
+  - forecast.solar api [documentation](https://swagger.forecast.solar/#/Weather/weatherGet)
 - 📍 **Location Management**: Define and reuse solar installation locations in the datasource configuration
 - 📊 **Multiple Data Types**: 
   - Power forecasts (watts)
