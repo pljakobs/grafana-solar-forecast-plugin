@@ -177,7 +177,7 @@ Contributions are welcome! Please see our [contributing guidelines](CONTRIBUTING
 
 ## 📄 License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GPL V3 - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Credits
 
