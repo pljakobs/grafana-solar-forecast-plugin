@@ -1,3 +1,12 @@
+#Warning: 
+
+this has been created as part of testing AI driven (not even AI assisted) coding. 
+I have not written nor modified any of the code included, so I don't take any responsibility for it's fitnes
+
+Id does work in my setup, though and does what I want it to do.
+
+You have been warned!
+
 # Solar Forecast Grafana Data Source Plugin
 
 A powerful Grafana data source plugin for solar power forecasting, supporting both **Forecast.Solar** and **Solcast** APIs.
@@ -9,6 +18,7 @@ A powerful Grafana data source plugin for solar power forecasting, supporting bo
 ## ✨ Features
 
 - 🌞 **Dual API Support**: Compatible with both Forecast.Solar (free/paid) and Solcast APIs
+  - forecast.solar api [documentation](https://swagger.forecast.solar/#/Weather/weatherGet)
 - 📍 **Location Management**: Define and reuse solar installation locations in the datasource configuration
 - 📊 **Multiple Data Types**: 
   - Power forecasts (watts)
@@ -168,7 +178,7 @@ Contributions are welcome! Please see our [contributing guidelines](CONTRIBUTING
 
 ## 📄 License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GPL V3 - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Credits
 
@@ -179,9 +189,6 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## 📞 Support
 
 - 🐛 **Issues**: [GitHub Issues](https://github.com/your-repo/solar-forecast-datasource/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/your-repo/solar-forecast-datasource/discussions)
-- 📚 **Documentation**: [Wiki](https://github.com/your-repo/solar-forecast-datasource/wiki)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/pljakobs/solar-forecast-datasource/discussions)
 
 ---
-
-**Made with ☀️ for the solar community**
