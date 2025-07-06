@@ -1,0 +1,222 @@
+name: Build and Release Solar Forecast Plugin
+
+on:
+  push:
+    tags:
+      - 'v*'
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  PLUGIN_NAME: solar-forecast-datasource
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test Plugin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run type checking
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
+
+  build:
+    runs-on: ubuntu-latest
+    name: Build Plugin
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Get plugin info
+        id: plugin-info
+        run: |
+          echo "plugin-version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+          echo "plugin-id=$(node -p "require('./plugin.json').id")" >> $GITHUB_OUTPUT
+          echo "archive-name=${PLUGIN_NAME}-v$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Package plugin
+        run: |
+          # Create release directory structure
+          mkdir -p release/${PLUGIN_NAME}
+          
+          # Copy built files
+          cp -r dist/* release/${PLUGIN_NAME}/
+          
+          # Copy necessary files
+          cp plugin.json release/${PLUGIN_NAME}/
+          cp README-RELEASE.md release/${PLUGIN_NAME}/README.md
+          cp LICENSE release/${PLUGIN_NAME}/
+          cp CHANGELOG.md release/${PLUGIN_NAME}/
+          
+          # Create archive
+          cd release
+          zip -r ../${{ steps.plugin-info.outputs.archive-name }}.zip ${PLUGIN_NAME}/
+          cd ..
+          
+          # Create tarball as well
+          cd release
+          tar -czf ../${{ steps.plugin-info.outputs.archive-name }}.tar.gz ${PLUGIN_NAME}/
+          cd ..
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.plugin-info.outputs.archive-name }}
+          path: |
+            ${{ steps.plugin-info.outputs.archive-name }}.zip
+            ${{ steps.plugin-info.outputs.archive-name }}.tar.gz
+          retention-days: 30
+
+      - name: Validate plugin structure
+        run: |
+          echo "=== Validating plugin structure ==="
+          if [ ! -f "release/${PLUGIN_NAME}/plugin.json" ]; then
+            echo "❌ plugin.json missing"
+            exit 1
+          fi
+          
+          if [ ! -f "release/${PLUGIN_NAME}/module.js" ]; then
+            echo "❌ module.js missing"
+            exit 1
+          fi
+          
+          if [ ! -f "release/${PLUGIN_NAME}/README.md" ]; then
+            echo "❌ README.md missing"
+            exit 1
+          fi
+          
+          echo "✅ Plugin structure validation passed"
+          echo "=== Plugin contents ==="
+          ls -la release/${PLUGIN_NAME}/
+
+  release:
+    runs-on: ubuntu-latest
+    name: Create Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get plugin info
+        id: plugin-info
+        run: |
+          echo "plugin-version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+          echo "archive-name=${PLUGIN_NAME}-v$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.plugin-info.outputs.archive-name }}
+
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          echo "## Solar Forecast Grafana Plugin v${{ steps.plugin-info.outputs.plugin-version }}" > release-notes.md
+          echo "" >> release-notes.md
+          echo "### 🌞 Features" >> release-notes.md
+          echo "- Complete frontend-only Grafana data source plugin" >> release-notes.md
+          echo "- Support for Forecast.Solar (free/paid) and Solcast APIs" >> release-notes.md
+          echo "- Location management system" >> release-notes.md
+          echo "- Multiple data types and forecast periods" >> release-notes.md
+          echo "- Smart API key detection and caching" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "### 📦 Installation" >> release-notes.md
+          echo "1. Download the plugin archive below" >> release-notes.md
+          echo "2. Extract to your Grafana plugins directory" >> release-notes.md
+          echo "3. Add to allowed unsigned plugins in grafana.ini" >> release-notes.md
+          echo "4. Restart Grafana" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "### 🔧 Requirements" >> release-notes.md
+          echo "- Grafana 10.0 or later" >> release-notes.md
+          echo "- Frontend-only plugin (no backend required)" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "See the [CHANGELOG.md](./CHANGELOG.md) for detailed changes." >> release-notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{ steps.plugin-info.outputs.archive-name }}.zip
+            ${{ steps.plugin-info.outputs.archive-name }}.tar.gz
+          body_path: release-notes.md
+          name: Solar Forecast Plugin v${{ steps.plugin-info.outputs.plugin-version }}
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  security-scan:
+    runs-on: ubuntu-latest
+    name: Security Scan
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security audit
+        run: npm audit --audit-level high
+
+      - name: Check for known vulnerabilities
+        run: |
+          # Run npm audit and capture output
+          npm audit --json > audit-results.json || true
+          
+          # Check if there are any high or critical vulnerabilities
+          HIGH_VULNS=$(cat audit-results.json | jq '.metadata.vulnerabilities.high // 0')
+          CRITICAL_VULNS=$(cat audit-results.json | jq '.metadata.vulnerabilities.critical // 0')
+          
+          echo "High vulnerabilities: $HIGH_VULNS"
+          echo "Critical vulnerabilities: $CRITICAL_VULNS"
+          
+          if [ "$HIGH_VULNS" -gt 0 ] || [ "$CRITICAL_VULNS" -gt 0 ]; then
+            echo "❌ Security vulnerabilities found"
+            cat audit-results.json | jq '.advisories'
+            exit 1
+          else
+            echo "✅ No high or critical security vulnerabilities found"
+          fi

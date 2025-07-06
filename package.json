@@ -1,0 +1,75 @@
+{
+  "name": "solar-forecast-datasource",
+  "version": "1.0.1",
+  "description": "Grafana data source plugin for solar power forecasts from Forecast.Solar and Solcast",
+  "scripts": {
+    "build": "webpack --mode production",
+    "dev": "webpack --mode development --watch",
+    "test": "jest --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --cache --ignore-path ./.gitignore --ext .js,.jsx,.ts,.tsx .",
+    "lint:fix": "npm run lint -- --fix",
+    "clean": "rm -rf dist/",
+    "package": "npm run build && npm run package:plugin",
+    "package:plugin": "mkdir -p release/solar-forecast-datasource && cp -r dist/* release/solar-forecast-datasource/ && cp plugin.json README-RELEASE.md LICENSE CHANGELOG.md release/solar-forecast-datasource/ && cd release && zip -r ../solar-forecast-datasource.zip solar-forecast-datasource/",
+    "serve": "webpack serve --mode development",
+    "version": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-repo/solar-forecast-datasource.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-repo/solar-forecast-datasource/issues"
+  },
+  "homepage": "https://github.com/your-repo/solar-forecast-datasource#readme",
+  "author": "Solar Forecast Plugin Contributors",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@grafana/data": "^10.0.0",
+    "@grafana/runtime": "^10.0.0",
+    "@grafana/ui": "^10.0.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@types/jest": "^29.5.14",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "css-loader": "^6.0.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^30.0.4",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "style-loader": "^3.0.0",
+    "ts-jest": "^29.4.0",
+    "ts-loader": "^9.0.0",
+    "typescript": "^5.0.0",
+    "webpack": "^5.0.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "grafana",
+    "plugin",
+    "datasource",
+    "solar",
+    "forecast",
+    "renewable",
+    "energy",
+    "forecast.solar",
+    "solcast",
+    "photovoltaic",
+    "pv"
+  ],
+  "grafana": {
+    "id": "solar-forecast-datasource",
+    "type": "datasource",
+    "version": "1.0.1"
+  }
+}
