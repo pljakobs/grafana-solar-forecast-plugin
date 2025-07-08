@@ -16,6 +16,8 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
   protected instanceSettings: DataSourceInstanceSettings<MyDataSourceOptions>;
   private cache: Map<string, { data: any; timestamp: number }> = new Map();
   private readonly CACHE_TTL = 30 * 60 * 1000; // 30 minutes cache
+  private readonly MIN_CACHE_TTL = 10 * 60 * 1000; // 10 minutes minimum cache for frequent refreshes
+  private lastApiCall: Map<string, number> = new Map(); // Track last API call per provider
 
   constructor(instanceSettings: DataSourceInstanceSettings<MyDataSourceOptions>) {
     super(instanceSettings);
@@ -97,25 +99,41 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     try {
       let allData: any;
       
-      // Check cache first
+      // Check cache first with intelligent TTL
       const cached = this.cache.get(cacheKey);
-      if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
-        console.log('Using cached data');
+      const cacheAge = cached ? Date.now() - cached.timestamp : Infinity;
+      const effectiveTTL = this.getEffectiveCacheTTL(provider, metric);
+      
+      if (cached && cacheAge < effectiveTTL) {
+        console.log(`Using cached data (age: ${Math.round(cacheAge / 1000 / 60)}min, TTL: ${Math.round(effectiveTTL / 1000 / 60)}min)`);
         allData = cached.data;
       } else {
-        console.log('Fetching fresh data from API');
+        // Check rate limiting before making API call
+        const minIntervalBetweenCalls = provider === 'solcast' ? 30 * 60 * 1000 : 5 * 60 * 1000; // 30min for Solcast, 5min for Forecast.Solar
+        const lastCall = this.lastApiCall.get(provider) || 0;
+        const timeSinceLastCall = Date.now() - lastCall;
         
-        if (provider === 'solcast') {
-          allData = await this.fetchSolcastData(latitude, longitude, solcastSiteId, {});
+        if (timeSinceLastCall < minIntervalBetweenCalls && cached) {
+          console.log(`Rate limiting: Using cached data to prevent API exhaustion (${Math.round(timeSinceLastCall / 1000 / 60)}min since last call)`);
+          allData = cached.data;
         } else {
-          allData = await this.fetchForecastSolarData(latitude, longitude, declination, azimuth, kwp, dataType, metric, startDate, endDate);
+          console.log('Fetching fresh data from API');
+          
+          if (provider === 'solcast') {
+            allData = await this.fetchSolcastData(latitude, longitude, solcastSiteId, {});
+          } else {
+            allData = await this.fetchForecastSolarData(latitude, longitude, declination, azimuth, kwp, dataType, metric, startDate, endDate);
+          }
+          
+          // Update last API call timestamp
+          this.lastApiCall.set(provider, Date.now());
+          
+          // Cache the result
+          this.cache.set(cacheKey, {
+            data: allData,
+            timestamp: Date.now()
+          });
         }
-        
-        // Cache the result
-        this.cache.set(cacheKey, {
-          data: allData,
-          timestamp: Date.now()
-        });
       }
 
       // Always format as time series - forecast period determines the time span
@@ -249,6 +267,26 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     return `${provider}-${latitude}-${longitude}-${declination}-${azimuth}-${kwp}-${solcastSiteId}-${dataType}-${metric}-${startDate}-${endDate}-${forecastPeriod}`;
   }
 
+  private getEffectiveCacheTTL(provider: string, metric?: string): number {
+    // For forecast data, longer cache times are more appropriate
+    // since forecasts don't change frequently during the day
+    
+    if (provider === 'solcast') {
+      // Solcast has strict 50 requests/day limit, use longer cache
+      return this.CACHE_TTL; // 30 minutes
+    }
+    
+    // Forecast.Solar free tier: 12 requests/hour = 1 request per 5 minutes
+    // With 5-minute dashboard refresh, we need at least 10-minute cache
+    if (metric === 'watt_hours_day') {
+      // Daily summaries change less frequently
+      return this.CACHE_TTL; // 30 minutes
+    }
+    
+    // For power/energy forecasts, use minimum cache to respect free tier limits
+    return Math.max(this.MIN_CACHE_TTL, this.CACHE_TTL / 3); // 10-15 minutes
+  }
+
   async fetchForecastSolarData(latitude: number, longitude: number, declination: number, azimuth: number, kwp: number, dataType: string = 'forecast', metric: string = 'watts', startDate?: string, endDate?: string): Promise<any> {
     // Use proxy route directly since direct API calls will fail due to CORS
     return await this.fetchForecastSolarDataViaProxy(latitude, longitude, declination, azimuth, kwp, dataType, metric, startDate, endDate);
@@ -342,11 +380,31 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     console.log(`📊 Data type: ${dataType}, Metric: ${metric}`);
     console.log('📍 Final URL:', url);
     console.log('🆔 Datasource UID:', this.instanceSettings.uid);
+    
+    // **DEBUG**: Log the actual API URL that will be called
+    const actualApiUrl = routePath === 'forecast-solar-paid' 
+      ? `https://api.forecast.solar/YOUR_API_KEY${endpointPath}`
+      : `https://api.forecast.solar${endpointPath}`;
+    console.log('🌐 **DEBUG** - Actual API URL that will be called:', actualApiUrl);
+    console.log('📋 **DEBUG** - Parameters:', { latitude, longitude, declination, azimuth, kwp, dataType, metric });
+    console.log('📅 **DEBUG** - Date range:', { startDate, endDate });
 
     try {
       // Use Grafana's HTTP client 
       const data = await getBackendSrv().get(url);
       console.log('✅ Proxy response received');
+      console.log('📊 **DEBUG** - Raw API Response structure:', {
+        hasResult: !!data.result,
+        resultKeys: data.result ? Object.keys(data.result) : 'No result',
+        hasMessage: !!data.message,
+        messageKeys: data.message ? Object.keys(data.message) : 'No message',
+        dataType: typeof data,
+        sampleResultData: data.result ? Object.keys(data.result).slice(0, 3).reduce((obj: any, key) => {
+          const values = data.result[key];
+          obj[key] = typeof values === 'object' ? `${Object.keys(values).length} entries` : values;
+          return obj;
+        }, {}) : 'No result data'
+      });
       return await this.processForecastSolarData(data, dataType, metric);
     } catch (error) {
       // For historical data, don't fall back to free tier since it's not supported
@@ -381,7 +439,7 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     // Log detailed rate limit information
     if (data.message && data.message.ratelimit) {
       const rateLimit = data.message.ratelimit;
-      console.log(`Forecast.Solar rate limit - Zone: ${rateLimit.zone}, Remaining: ${rateLimit.remaining}/${rateLimit.limit} (resets every ${rateLimit.period/60} minutes)`);
+      console.log(`🚦 Forecast.Solar rate limit - Zone: ${rateLimit.zone}, Remaining: ${rateLimit.remaining}/${rateLimit.limit} (resets every ${rateLimit.period/60} minutes)`);
       
       // Warn if getting close to limit
       if (rateLimit.remaining <= 2) {
@@ -392,11 +450,26 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     // Log location confirmation
     if (data.message && data.message.info) {
       const info = data.message.info;
-      console.log(`Forecast location: ${info.place} (${info.latitude}, ${info.longitude})`);
+      console.log(`📍 **DEBUG** - Forecast location confirmed: ${info.place} (${info.latitude}, ${info.longitude})`);
+      console.log(`🏠 **DEBUG** - System info: ${info.total_kwp || 'N/A'} kWp, ${info.azimuth || 'N/A'}° azimuth, ${info.tilt || 'N/A'}° tilt`);
     }
     
     console.log(`📊 Processing ${dataType} data for metric: ${metric}`);
-    console.log('Raw API response structure:', Object.keys(data.result || {}));
+    console.log('📋 **DEBUG** - Raw API response structure:', Object.keys(data.result || {}));
+    
+    // **DEBUG**: Log sample values for each available metric
+    if (data.result) {
+      console.log('📈 **DEBUG** - Sample values from each metric:');
+      Object.keys(data.result).forEach(metricKey => {
+        const values = data.result[metricKey];
+        if (typeof values === 'object' && values !== null) {
+          const entries = Object.entries(values);
+          const sampleCount = Math.min(3, entries.length);
+          const samples = entries.slice(0, sampleCount).map(([time, value]) => `${time}: ${value}`);
+          console.log(`  - ${metricKey}: ${entries.length} entries, samples: [${samples.join(', ')}]`);
+        }
+      });
+    }
     
     const result: any = {};
     
@@ -508,10 +581,23 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     // Use proxy route with correct Grafana proxy format
     const url = `/api/datasources/proxy/uid/${this.instanceSettings.uid}/solcast/rooftop_sites/${solcastSiteId}/forecasts`;
     
-    console.log('Fetching Solcast data via proxy from URL:', url);
+    console.log('🌐 **DEBUG** - Fetching Solcast data via proxy from URL:', url);
+    console.log('📋 **DEBUG** - Solcast Parameters:', { latitude, longitude, solcastSiteId });
+    console.log('🌐 **DEBUG** - Actual API URL:', `https://api.solcast.com.au/rooftop_sites/${solcastSiteId}/forecasts`);
     
     // Use Grafana's HTTP client instead of raw fetch
     const data = await getBackendSrv().get(url);
+    
+    console.log('📊 **DEBUG** - Solcast API Response:', {
+      hasForecasts: !!data.forecasts,
+      forecastCount: data.forecasts ? data.forecasts.length : 0,
+      sampleForecast: data.forecasts && data.forecasts.length > 0 ? {
+        period_end: data.forecasts[0].period_end,
+        pv_estimate: data.forecasts[0].pv_estimate,
+        pv_estimate10: data.forecasts[0].pv_estimate10,
+        pv_estimate90: data.forecasts[0].pv_estimate90
+      } : 'No forecasts'
+    });
     
     // Solcast only provides power forecasts, so we structure it similar to forecast.solar
     const result = {
@@ -523,6 +609,11 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
       const periodEnd = new Date(forecast.period_end);
       const timestamp = Math.floor(periodEnd.getTime() / 1000) - 1800; // Subtract 30 minutes
       result.watts[timestamp.toString()] = watts;
+    });
+
+    console.log('📈 **DEBUG** - Processed Solcast data:', {
+      wattsEntries: Object.keys(result.watts).length,
+      sampleValues: Object.entries(result.watts).slice(0, 3).map(([time, value]) => `${new Date(parseInt(time) * 1000).toISOString()}: ${value}W`)
     });
 
     return result;
