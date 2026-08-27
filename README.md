@@ -174,11 +174,11 @@ The plugin uses Grafana's proxy feature for secure API access:
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see our [contributing guidelines](CONTRIBUTING.md) for details.
+Contributions are welcome! Please see our [contributing guidelines](https://github.com/pljakobs/solar-forecast-datasource/blob/main/CONTRIBUTING.md) for details.
 
 ## 📄 License
 
-This project is licensed under the GPL V3 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GPL V3 - see the [LICENSE](https://github.com/pljakobs/solar-forecast-datasource/blob/main/LICENSE) file for details.
 
 ## 🙏 Credits
 
