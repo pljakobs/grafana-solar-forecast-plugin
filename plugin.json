@@ -11,7 +11,10 @@
       "url": "https://github.com/your-repo/solar-forecast-datasource"
     },
     "keywords": ["solar", "forecast", "renewable", "energy"],
-    "logos": "img/logo.svg",
+    "logos": {
+      "small": "img/logo_small.png",
+      "large": "img/logo_large.png"
+    },
     "links": [
       {"name": "Website", "url": "https://github.com/your-repo/solar-forecast-datasource"},
       {"name": "Apache License", "url": "https://github.com/your-repo/solar-forecast-datasource/blob/main/LICENSE"}
