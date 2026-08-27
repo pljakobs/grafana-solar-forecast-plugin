@@ -68,20 +68,20 @@ jobs:
         run: |
           # Create release directory structure
           mkdir -p release/${PLUGIN_NAME}
-          
+
           # Copy built files
           cp -r dist/* release/${PLUGIN_NAME}/
-          
+
           # Copy necessary metadata files
           cp plugin.json release/${PLUGIN_NAME}/
           [ -f README.md ] && cp README.md release/${PLUGIN_NAME}/
           [ -f LICENSE ] && cp LICENSE release/${PLUGIN_NAME}/
           [ -f CHANGELOG.md ] && cp CHANGELOG.md release/${PLUGIN_NAME}/
-          
-          # Create archive
+
+          # Create archive directly inside the release folder
           cd release
-          zip -qr ../${{ steps.plugin-info.outputs.archive-name }}.zip ${PLUGIN_NAME}/
-          tar -czf ../${{ steps.plugin-info.outputs.archive-name }}.tar.gz ${PLUGIN_NAME}/
+          zip -qr ${{ steps.plugin-info.outputs.archive-name }}.zip ${PLUGIN_NAME}/
+          tar -czf ${{ steps.plugin-info.outputs.archive-name }}.tar.gz ${PLUGIN_NAME}/
           cd ..
 
       - name: Run Grafana Plugin Validator
@@ -93,8 +93,8 @@ jobs:
         with:
           name: ${{ steps.plugin-info.outputs.archive-name }}
           path: |
-            ${{ steps.plugin-info.outputs.archive-name }}.zip
-            ${{ steps.plugin-info.outputs.archive-name }}.tar.gz
+            release/${{ steps.plugin-info.outputs.archive-name }}.zip
+            release/${{ steps.plugin-info.outputs.archive-name }}.tar.gz
           retention-days: 30
 
   release:
