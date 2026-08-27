@@ -2,16 +2,16 @@
   "name": "solar-forecast-datasource",
   "version": "1.0.1",
   "description": "Grafana data source plugin for solar power forecasts from Forecast.Solar and Solcast",
-  "scripts": {
+   "scripts": {
     "build": "webpack --mode production",
     "dev": "webpack --mode development --watch",
     "test": "jest --passWithNoTests",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --cache ",
+    "lint": "tsc --noEmit",
     "lint:fix": "npm run lint -- --fix",
     "clean": "rm -rf dist/",
     "package": "npm run build && npm run package:plugin",
-    "package:plugin": "mkdir -p release/solar-forecast-datasource && cp -r dist/* release/solar-forecast-datasource/ && cp plugin.json README-RELEASE.md LICENSE CHANGELOG.md release/solar-forecast-datasource/ && cd release && zip -r ../solar-forecast-datasource.zip solar-forecast-datasource/",
+    "package:plugin": "mkdir -p release/solar-forecast-datasource && cp -r dist/* release/solar-forecast-datasource/ && cp plugin.json README.md LICENSE CHANGELOG.md release/solar-forecast-datasource/ && cd release && zip -r ../solar-forecast-datasource.zip solar-forecast-datasource/",
     "serve": "webpack serve --mode development",
     "version": "npm run build"
   },
