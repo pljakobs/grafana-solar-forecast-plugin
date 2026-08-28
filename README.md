@@ -1,4 +1,4 @@
-#Warning: 
+# Warning: 
 
 this has been created as part of testing AI driven (not even AI assisted) coding. 
 I have not written nor modified any of the code included, so I don't take any responsibility for it's fitnes
@@ -34,7 +34,7 @@ A powerful Grafana data source plugin for solar power forecasting, supporting bo
 
 ### Installation
 
-1. **Download** the latest release from the [releases page](https://github.com/your-repo/solar-forecast-datasource/releases)
+1. **Download** the latest release from the [releases page](https://github.com/pljakobs/solar-forecast-datasource/releases)
 2. **Extract** the plugin to your Grafana plugins directory:
    ```bash
    # Extract to Grafana plugins directory
@@ -174,7 +174,7 @@ The plugin uses Grafana's proxy feature for secure API access:
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see our [contributing guidelines](https://github.com/pljakobs/solar-forecast-datasource/blob/main/CONTRIBUTING.md) for details.
+Contributions are welcome! Please open an issue or pull request on GitHub.
 
 ## 📄 License
 
@@ -188,7 +188,7 @@ This project is licensed under the GPL V3 - see the [LICENSE](https://github.com
 
 ## 📞 Support
 
-- 🐛 **Issues**: [GitHub Issues](https://github.com/your-repo/solar-forecast-datasource/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/pljakobs/solar-forecast-datasource/discussions)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/pljakobs/solar-forecast-datasource/issues)
 
 ---
+

@@ -1,0 +1,63 @@
+{
+  "name": "Solar Forecast",
+  "id": "solar-forecast-datasource",
+  "type": "datasource",
+  "metrics": true,
+  "annotations": false,
+  "info": {
+    "description": "Data source for solar power forecasts from Forecast.Solar and Solcast",
+    "author": {
+      "name": "Solar Forecast Plugin",
+      "url": "https://github.com/pljakobs/solar-forecast-datasource"
+    },
+    "keywords": ["solar", "forecast", "renewable", "energy"],
+    "logos": {
+      "small": "img/logo_small.png",
+      "large": "img/logo_large.png"
+    },
+    "links": [
+      {
+        "name": "Website",
+        "url": "https://github.com/pljakobs/solar-forecast-datasource"
+      },
+      {
+        "name": "License",
+        "url": "https://github.com/pljakobs/solar-forecast-datasource/blob/main/LICENSE"
+      }
+    ],
+    "screenshots": [],
+    "version": "1.0.1",
+    "updated": "2025-07-06"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=10.0.0",
+    "plugins": []
+  },
+  "routes": [
+    {
+      "path": "forecast-solar-free",
+      "method": "*",
+      "url": "https://api.forecast.solar",
+      "headers": [
+        {"name": "Accept", "content": "application/json"}
+      ]
+    },
+    {
+      "path": "forecast-solar-paid",
+      "method": "*",
+      "url": "https://api.forecast.solar/{{ .SecureJsonData.apiKey }}",
+      "headers": [
+        {"name": "Accept", "content": "application/json"}
+      ]
+    },
+    {
+      "path": "solcast",
+      "method": "*", 
+      "url": "https://api.solcast.com.au",
+      "headers": [
+        {"name": "Accept", "content": "application/json"},
+        {"name": "Authorization", "content": "Bearer {{ .SecureJsonData.apiKey }}"}
+      ]
+    }
+  ]
+}
