@@ -8,7 +8,7 @@
     "description": "Data source for solar power forecasts from Forecast.Solar and Solcast",
     "author": {
       "name": "Solar Forecast Plugin",
-      "url": "https://github.com/your-repo/solar-forecast-datasource"
+      "url": "https://github.com/pljakobs/grafana-solar-forecast-plugin"
     },
     "keywords": ["solar", "forecast", "renewable", "energy"],
     "logos": {
@@ -16,8 +16,8 @@
       "large": "img/logo_large.png"
     },
     "links": [
-      {"name": "Website", "url": "https://github.com/your-repo/solar-forecast-datasource"},
-      {"name": "Apache License", "url": "https://github.com/your-repo/solar-forecast-datasource/blob/main/LICENSE"}
+      {"name": "Website", "url": "https://github.com/pljakobs/grafana-solar-forecast-plugin"},
+      {"name": "Apache License", "url": "https://github.com/pljakobs/grafana-solar-forecast-plugin/blob/main/LICENSE"}
     ],
     "screenshots": [],
     "version": "1.0.2",

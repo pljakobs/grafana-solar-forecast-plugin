@@ -34,17 +34,38 @@ A powerful Grafana data source plugin for solar power forecasting, supporting bo
 
 ### Installation
 
-1. **Download** the latest release from the [releases page](https://github.com/pljakobs/solar-forecast-datasource/releases)
+This plugin is unsigned and not published to the Grafana catalog, so it must be installed manually.
+
+#### Option A: Download a release
+
+1. **Download** the latest release archive from the [releases page](https://github.com/pljakobs/grafana-solar-forecast-plugin/releases)
 2. **Extract** the plugin to your Grafana plugins directory:
    ```bash
-   # Extract to Grafana plugins directory
-   sudo unzip solar-forecast-datasource-v1.0.1.zip -d /var/lib/grafana/plugins/
-   
+   sudo unzip solar-forecast-datasource-v*.zip -d /var/lib/grafana/plugins/
+
    # Set proper permissions
    sudo chown -R grafana:grafana /var/lib/grafana/plugins/solar-forecast-datasource
    ```
 
-3. **Configure Grafana** to allow unsigned plugins (add to `grafana.ini`):
+#### Option B: Build from source
+
+1. **Clone** the repository and build the plugin:
+   ```bash
+   git clone https://github.com/pljakobs/grafana-solar-forecast-plugin.git
+   cd grafana-solar-forecast-plugin
+   npm install
+   npm run build
+   ```
+2. **Copy** the built `dist/` output plus metadata files to your Grafana plugins directory:
+   ```bash
+   sudo mkdir -p /var/lib/grafana/plugins/solar-forecast-datasource
+   sudo cp -r dist/* /var/lib/grafana/plugins/solar-forecast-datasource/
+   sudo chown -R grafana:grafana /var/lib/grafana/plugins/solar-forecast-datasource
+   ```
+
+#### Allow the unsigned plugin and restart
+
+3. **Configure Grafana** to allow this unsigned plugin (add to `grafana.ini`):
    ```ini
    [plugins]
    allow_loading_unsigned_plugins = solar-forecast-datasource
@@ -178,7 +199,7 @@ Contributions are welcome! Please open an issue or pull request on GitHub.
 
 ## 📄 License
 
-This project is licensed under the GPL V3 - see the [LICENSE](https://github.com/pljakobs/solar-forecast-datasource/blob/main/LICENSE) file for details.
+This project is licensed under the GPL V3 - see the [LICENSE](https://github.com/pljakobs/grafana-solar-forecast-plugin/blob/main/LICENSE) file for details.
 
 ## 🙏 Credits
 
@@ -188,7 +209,7 @@ This project is licensed under the GPL V3 - see the [LICENSE](https://github.com
 
 ## 📞 Support
 
-- 🐛 **Issues**: [GitHub Issues](https://github.com/pljakobs/solar-forecast-datasource/issues)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/pljakobs/grafana-solar-forecast-plugin/issues)
 
 ---
 
