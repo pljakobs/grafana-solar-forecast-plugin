@@ -1,15 +1,4 @@
-JSON
-
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "preserveConstEnums": true,
-    "jsx": "react-jsx"
-  },
-  "include": ["src", "webpack.config.ts"]
+  "extends": "./.config/tsconfig.json"
 }
 

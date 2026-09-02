@@ -8,6 +8,11 @@ yarn-error.log*
 dist/
 build/
 release/
+/module.js
+/module.js.map
+/module.js.LICENSE.txt
+/webpack.config.js
+/*.d.ts
 
 # Development
 .cache/

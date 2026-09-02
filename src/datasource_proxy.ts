@@ -1,5 +1,4 @@
 import {
-  CoreApp,
   DataQueryRequest,
   DataQueryResponse,
   DataSourceApi,
@@ -91,7 +90,6 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     const metric = query.metric || 'watts';
     const startDate = query.startDate;
     const endDate = query.endDate;
-    const forecastPeriod = query.forecastPeriod || 'all';
     
     // Create cache key based on all parameters
     const cacheKey = this.getCacheKey(provider, latitude, longitude, declination, azimuth, kwp, solcastSiteId, dataType, metric, startDate, endDate, query.forecastPeriod);
@@ -678,29 +676,6 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
         status: 'error',
         message: `Connection failed: ${errorMessage}`,
       };
-    }
-  }
-
-  private mapForecastPeriodToDay(forecastPeriod: string): string {
-    // Map forecast period to day offset for backward compatibility
-    switch (forecastPeriod) {
-      case 'today':
-        return '0';
-      case 'tomorrow':
-        return '1';
-      case 'day+2':
-        return '2';
-      case 'day+3':
-        return '3';
-      case 'day+4':
-        return '4';
-      case 'day+5':
-        return '5';
-      case 'day+6':
-        return '6';
-      case 'all':
-      default:
-        return 'all';
     }
   }
 

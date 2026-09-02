@@ -8,4 +8,11 @@ const compat = new FlatCompat({
 
 module.exports = [
     ...compat.extends("./.eslintrc"), // Update filename if your old config was .eslintrc.json or similar
+    {
+        files: ["eslint.config.js"],
+        rules: {
+            "@typescript-eslint/no-require-imports": "off",
+            "@typescript-eslint/no-unused-vars": "off",
+        },
+    },
 ];

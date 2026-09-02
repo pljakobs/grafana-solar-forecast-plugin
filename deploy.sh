@@ -8,7 +8,7 @@ set -e  # Exit on any error
 # Configuration
 GRAFANA_HOST="grafana.fritz.box"
 PLUGIN_NAME="solar-forecast-datasource"
-LOCAL_DIST_DIR="/home/pjakobs/devel/grafana-plugin/dist"
+LOCAL_DIST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/dist"
 REMOTE_PLUGIN_DIR="/var/lib/grafana/plugins/${PLUGIN_NAME}"
 TEMP_DIR="/tmp/solar-forecast-plugin-deploy"
 
