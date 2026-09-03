@@ -620,7 +620,9 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
   async testDatasource() {
     const { jsonData } = this.instanceSettings;
     const secureFields = (this.instanceSettings as any).secureJsonFields;
-    const hasApiKey = secureFields && secureFields.apiKey === true;
+    const hasApiKeyInSecureFields = secureFields && secureFields.apiKey === true;
+    const hasApiKeyFlag = jsonData && (jsonData as any).hasApiKey;
+    const hasApiKey = hasApiKeyInSecureFields || hasApiKeyFlag;
 
     console.log('Testing datasource with provider:', jsonData.provider);
     console.log('Has API key configured:', !!hasApiKey);

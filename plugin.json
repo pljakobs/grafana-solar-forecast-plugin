@@ -20,7 +20,7 @@
       {"name": "Apache License", "url": "https://github.com/pljakobs/grafana-solar-forecast-plugin/blob/main/LICENSE"}
     ],
     "screenshots": [],
-    "version": "1.0.3",
+    "version": "1.0.4",
     "updated": "2026-09-02"
   },
   "dependencies": {

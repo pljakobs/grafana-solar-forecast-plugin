@@ -76,6 +76,31 @@ This plugin is unsigned and not published to the Grafana catalog, so it must be 
    sudo systemctl restart grafana-server
    ```
 
+### Updating an existing installation
+
+Datasource instances (provider, API key, saved locations) are stored in Grafana's own
+database, not in the plugin directory, so upgrading the plugin files is safe and does
+**not** require recreating datasources or dashboards.
+
+1. **Download** the new release archive from the [releases page](https://github.com/pljakobs/grafana-solar-forecast-plugin/releases).
+2. **Replace** the plugin directory entirely (don't just overwrite files in place — stale
+   files from an older version left behind can cause hard-to-diagnose bugs):
+   ```bash
+   sudo systemctl stop grafana-server
+   sudo rm -rf /var/lib/grafana/plugins/solar-forecast-datasource
+   sudo mkdir -p /var/lib/grafana/plugins/solar-forecast-datasource
+   sudo unzip -o solar-forecast-datasource-vX.Y.Z.zip -d /var/lib/grafana/plugins/
+   sudo chown -R grafana:grafana /var/lib/grafana/plugins/solar-forecast-datasource
+   sudo systemctl start grafana-server
+   ```
+3. **Hard-reload** your browser tab (Ctrl+Shift+R). Grafana appends the plugin's version
+   as a cache-busting query string to its assets, so a normal version bump is enough to
+   avoid serving a stale cached `module.js` — no manual cache clearing needed beyond the
+   browser reload.
+4. Verify the new version loaded: open the datasource's **Settings** page and check the
+   footer/version info, or inspect `https://<your-grafana>/public/plugins/solar-forecast-datasource/module.js`
+   for the new version string in its header comment.
+
 ### Configuration
 
 1. Navigate to **Configuration → Data Sources** in Grafana

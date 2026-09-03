@@ -1,6 +1,6 @@
 {
   "name": "solar-forecast-datasource",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Grafana data source plugin for solar power forecasts from Forecast.Solar and Solcast",
   "scripts": {
     "build": "webpack -c ./webpack.config.ts --env production",
@@ -90,6 +90,6 @@
   "grafana": {
     "id": "solar-forecast-datasource",
     "type": "datasource",
-    "version": "1.0.3"
+    "version": "1.0.4"
   }
 }

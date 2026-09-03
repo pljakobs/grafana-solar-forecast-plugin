@@ -299,8 +299,8 @@ export class ConfigEditor extends PureComponent<Props, State> {
         <div className="gf-form-group">
           <h6>Solar Locations</h6>
           <div className="gf-form">
-            <div className="gf-form-label width-12">
-              <span>Manage predefined solar installation locations for easy selection in panels.</span>
+            <div style={{ fontSize: '13px', color: '#888', marginBottom: '8px' }}>
+              Manage predefined solar installation locations for easy selection in panels.
             </div>
           </div>
           
