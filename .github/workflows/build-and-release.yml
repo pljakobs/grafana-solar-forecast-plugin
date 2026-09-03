@@ -2,11 +2,12 @@ name: Build and Release Solar Forecast Plugin
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch:
-    default: master
+    default: main
     
 env:
   PLUGIN_NAME: solar-forecast-datasource
