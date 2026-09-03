@@ -16,12 +16,18 @@
       "large": "img/logo_large.png"
     },
     "links": [
-      {"name": "Website", "url": "https://github.com/pljakobs/grafana-solar-forecast-plugin"},
-      {"name": "Apache License", "url": "https://github.com/pljakobs/grafana-solar-forecast-plugin/blob/main/LICENSE"}
+      {
+        "name": "Website",
+        "url": "https://github.com/pljakobs/grafana-solar-forecast-plugin"
+      },
+      {
+        "name": "License",
+        "url": "https://github.com/pljakobs/grafana-solar-forecast-plugin/blob/main/LICENSE"
+      }
     ],
     "screenshots": [],
     "version": "1.0.2",
-    "updated": "2025-07-06"
+    "updated": "2026-09-02"
   },
   "dependencies": {
     "grafanaDependency": ">=10.0.0",

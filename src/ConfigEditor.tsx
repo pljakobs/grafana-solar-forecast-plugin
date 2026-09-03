@@ -5,7 +5,7 @@ import { MyDataSourceOptions, MySecureJsonData, SolarLocation } from './types';
 
 const { SecretFormField, FormField } = LegacyForms;
 
-interface Props extends DataSourcePluginOptionsEditorProps<MyDataSourceOptions> {}
+type Props = DataSourcePluginOptionsEditorProps<MyDataSourceOptions>;
 
 interface State {
   showLocationModal: boolean;

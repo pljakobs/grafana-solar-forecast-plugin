@@ -117,7 +117,7 @@ export class QueryEditor extends PureComponent<Props> {
 
   render() {
     const query = { ...DEFAULT_QUERY, ...this.props.query };
-    const { queryText, metric, dataType, latitude, longitude, declination, azimuth, kwp, solcastSiteId, startDate, endDate, forecastPeriod } = query;
+    const { queryText, metric, dataType, latitude, longitude, declination, azimuth, kwp, solcastSiteId, startDate, endDate } = query;
     const { datasource } = this.props;
     // Use the public getProvider method
     const provider = datasource.getProvider();
