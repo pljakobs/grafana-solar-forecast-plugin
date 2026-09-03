@@ -13,6 +13,14 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # react-router is only a transitive dependency of @grafana/ui /
+      # @grafana/runtime (and is externalized in webpack, so it never
+      # ships in the built plugin). The only non-vulnerable version
+      # requires downgrading @grafana/runtime from 13.x to 11.x, which
+      # Dependabot can't resolve automatically. Revisit once upstream
+      # @grafana packages bump their own react-router-dom pin.
+      - dependency-name: "react-router"
 
   # Keep GitHub Actions versions current
   - package-ecosystem: "github-actions"
