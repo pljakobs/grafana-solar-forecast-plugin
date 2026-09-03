@@ -80,6 +80,13 @@ export class QueryEditor extends PureComponent<Props> {
     onRunQuery();
   };
 
+  onForecastDaysChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onChange, query, onRunQuery } = this.props;
+    const value = parseInt(event.target.value, 10);
+    onChange({ ...query, forecastDays: isNaN(value) ? undefined : Math.min(8, Math.max(1, value)) });
+    onRunQuery();
+  };
+
   onLocationChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const { onChange, query, onRunQuery } = this.props;
     const selectedLocationId = event.target.value;
@@ -117,7 +124,7 @@ export class QueryEditor extends PureComponent<Props> {
 
   render() {
     const query = { ...DEFAULT_QUERY, ...this.props.query };
-    const { queryText, metric, dataType, latitude, longitude, declination, azimuth, kwp, solcastSiteId, startDate, endDate } = query;
+    const { queryText, metric, dataType, latitude, longitude, declination, azimuth, kwp, solcastSiteId, startDate, endDate, forecastDays } = query;
     const { datasource } = this.props;
     // Use the public getProvider method
     const provider = datasource.getProvider();
@@ -188,6 +195,14 @@ export class QueryEditor extends PureComponent<Props> {
                 </select>
               }
             />
+            <FormField
+              width={4}
+              type="number"
+              value={forecastDays ?? 8}
+              onChange={this.onForecastDaysChange}
+              label="Forecast Days"
+              tooltip="Number of days to request from the API (1-8). Forecast.Solar's 'limit' parameter - higher values require a plan that supports that many days ahead."
+            />
           </div>
         )}
 
@@ -222,8 +237,8 @@ export class QueryEditor extends PureComponent<Props> {
                 value={startDate || ''}
                 onChange={this.onStartDateChange}
                 label="Start Date"
-                placeholder="YYYY-MM-DD"
-                tooltip="Start date for historical data (YYYY-MM-DD format)"
+                placeholder="Uses dashboard time range"
+                tooltip="Start date for historical data (YYYY-MM-DD). Leave empty to use the dashboard's time range picker instead."
                 type="date"
               />
             </div>
@@ -233,8 +248,8 @@ export class QueryEditor extends PureComponent<Props> {
                 value={endDate || ''}
                 onChange={this.onEndDateChange}
                 label="End Date"
-                placeholder="YYYY-MM-DD"
-                tooltip="End date for historical data (YYYY-MM-DD format)"
+                placeholder="Uses dashboard time range"
+                tooltip="End date for historical data (YYYY-MM-DD). Leave empty to use the dashboard's time range picker instead."
                 type="date"
               />
             </div>

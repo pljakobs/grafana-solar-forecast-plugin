@@ -33,7 +33,10 @@ export interface MyQuery extends DataQuery {
   // Historical data options
   startDate?: string; // YYYY-MM-DD format
   endDate?: string;   // YYYY-MM-DD format
-  
+
+  // Number of forecast days to request from the API (1-8, Forecast.Solar 'limit' parameter)
+  forecastDays?: number;
+
   // Forecast period selection - replaces old format/forecastDay
   forecastPeriod?: string; // 'today', 'tomorrow', 'day+2', 'day+3', 'all'
 }
@@ -48,6 +51,7 @@ export const DEFAULT_QUERY: Partial<MyQuery> = {
   declination: 30,
   azimuth: 180,
   kwp: 5.0,
+  forecastDays: 8,
   forecastPeriod: 'all',
 };
 
@@ -56,6 +60,8 @@ export const METRIC_OPTIONS = [
   { label: 'Energy per Period (Wh)', value: 'watt_hours_period' },
   { label: 'Energy Accumulated (Wh)', value: 'watt_hours' },
   { label: 'Daily Energy Summary (Wh/day)', value: 'watt_hours_day' },
+  { label: '% of Typical Day (PVGIS baseline)', value: 'percent_of_typical_day' },
+  { label: '% of Typical Month (PVGIS baseline)', value: 'percent_of_typical_month' },
 ];
 
 export const DATA_TYPE_OPTIONS = [

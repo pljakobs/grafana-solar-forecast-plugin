@@ -16,6 +16,7 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
   private cache: Map<string, { data: any; timestamp: number }> = new Map();
   private readonly CACHE_TTL = 30 * 60 * 1000; // 30 minutes cache
   private readonly MIN_CACHE_TTL = 10 * 60 * 1000; // 10 minutes minimum cache for frequent refreshes
+  private readonly PVGIS_BASELINE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days - auto-refresh monthly
   private lastApiCall: Map<string, number> = new Map(); // Track last API call per provider
 
   constructor(instanceSettings: DataSourceInstanceSettings<MyDataSourceOptions>) {
@@ -88,11 +89,17 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     const solcastSiteId = query.solcastSiteId;
     const dataType = query.dataType || 'forecast';
     const metric = query.metric || 'watts';
-    const startDate = query.startDate;
-    const endDate = query.endDate;
+    const forecastDays = query.forecastDays;
+
+    // For historical queries, default to the dashboard panel's actual time range
+    // (v-time-start/v-time-stop) unless the user explicitly overrode the dates.
+    const rangeStartDate = new Date(from).toISOString().split('T')[0];
+    const rangeEndDate = new Date(to).toISOString().split('T')[0];
+    const startDate = query.startDate || (dataType === 'historical' ? rangeStartDate : undefined);
+    const endDate = query.endDate || (dataType === 'historical' ? rangeEndDate : undefined);
     
     // Create cache key based on all parameters
-    const cacheKey = this.getCacheKey(provider, latitude, longitude, declination, azimuth, kwp, solcastSiteId, dataType, metric, startDate, endDate, query.forecastPeriod);
+    const cacheKey = this.getCacheKey(provider, latitude, longitude, declination, azimuth, kwp, solcastSiteId, dataType, metric, startDate, endDate, query.forecastPeriod, forecastDays);
     
     try {
       let allData: any;
@@ -117,10 +124,19 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
         } else {
           console.log('Fetching fresh data from API');
           
+          const isPercentOfTypical = metric === 'percent_of_typical_day' || metric === 'percent_of_typical_month';
+          // Percent-of-typical metrics are derived after the fact; fetch the underlying
+          // energy data using a real metric so the API/endpoint selection above stays valid.
+          const fetchMetric = isPercentOfTypical ? (dataType === 'historical' ? 'watthours' : 'watt_hours_day') : metric;
+
           if (provider === 'solcast') {
             allData = await this.fetchSolcastData(latitude, longitude, solcastSiteId, {});
           } else {
-            allData = await this.fetchForecastSolarData(latitude, longitude, declination, azimuth, kwp, dataType, metric, startDate, endDate);
+            allData = await this.fetchForecastSolarData(latitude, longitude, declination, azimuth, kwp, dataType, fetchMetric, startDate, endDate, forecastDays);
+          }
+
+          if (isPercentOfTypical && provider !== 'solcast') {
+            await this.addPercentOfTypicalData(allData, latitude, longitude, declination, azimuth, kwp, metric);
           }
           
           // Update last API call timestamp
@@ -260,9 +276,9 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     return parsed;
   }
 
-  private getCacheKey(provider: string, latitude: number, longitude: number, declination?: number, azimuth?: number, kwp?: number, solcastSiteId?: string, dataType?: string, metric?: string, startDate?: string, endDate?: string, forecastPeriod?: string): string {
+  private getCacheKey(provider: string, latitude: number, longitude: number, declination?: number, azimuth?: number, kwp?: number, solcastSiteId?: string, dataType?: string, metric?: string, startDate?: string, endDate?: string, forecastPeriod?: string, forecastDays?: number): string {
     // Create a unique cache key based on configuration
-    return `${provider}-${latitude}-${longitude}-${declination}-${azimuth}-${kwp}-${solcastSiteId}-${dataType}-${metric}-${startDate}-${endDate}-${forecastPeriod}`;
+    return `${provider}-${latitude}-${longitude}-${declination}-${azimuth}-${kwp}-${solcastSiteId}-${dataType}-${metric}-${startDate}-${endDate}-${forecastPeriod}-${forecastDays}`;
   }
 
   private getEffectiveCacheTTL(provider: string, metric?: string): number {
@@ -285,12 +301,133 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     return Math.max(this.MIN_CACHE_TTL, this.CACHE_TTL / 3); // 10-15 minutes
   }
 
-  async fetchForecastSolarData(latitude: number, longitude: number, declination: number, azimuth: number, kwp: number, dataType: string = 'forecast', metric: string = 'watts', startDate?: string, endDate?: string): Promise<any> {
-    // Use proxy route directly since direct API calls will fail due to CORS
-    return await this.fetchForecastSolarDataViaProxy(latitude, longitude, declination, azimuth, kwp, dataType, metric, startDate, endDate);
+  // Fetches a long-term "typical" monthly energy baseline from PVGIS (climate record
+  // 2014-2024) for the exact location/tilt/azimuth/kwp combination. Cached per-location
+  // for PVGIS_BASELINE_TTL (30 days) since this is climate-normal data, not live weather.
+  // Returns 12 values (Wh), index 0 = January, or null if the baseline couldn't be fetched.
+  private async fetchPvgisMonthlyBaseline(latitude: number, longitude: number, declination: number, azimuth: number, kwp: number): Promise<number[] | null> {
+    const cacheKey = `pvgis-monthly-${latitude}-${longitude}-${declination}-${azimuth}-${kwp}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.PVGIS_BASELINE_TTL) {
+      return cached.data;
+    }
+
+    try {
+      const params = new URLSearchParams({
+        longitude: String(longitude),
+        latitude: String(latitude),
+        surface_orientation: String(azimuth),
+        surface_tilt: String(declination),
+        'peak-power': String(kwp),
+        start_time: '2014-01-01T00:00:00',
+        end_time: '2024-12-31T23:59:59',
+        groupby: 'Monthly',
+        analysis: 'Simple',
+        statistics: 'true',
+      });
+      const url = `/api/datasources/proxy/uid/${this.instanceSettings.uid}/pvgis/performance/broadband?${params.toString()}`;
+      const response = await getBackendSrv().get(url);
+      const summary = response?.statistics?.monthly_energy_summary;
+      if (!summary || typeof summary !== 'object') {
+        return null;
+      }
+
+      // The API keys monthly summaries as "YYYY-MM" across the whole climate record,
+      // so we average all Januaries together, all Februaries together, etc. to get a
+      // true calendar-month "typical" value. Values may be plain numbers or {value, unit}.
+      const monthTotals = new Array(12).fill(0);
+      const monthCounts = new Array(12).fill(0);
+      for (const [key, raw] of Object.entries(summary)) {
+        const match = /-(\d{2})$/.exec(key);
+        if (!match) {
+          continue;
+        }
+        const monthIndex = parseInt(match[1], 10) - 1;
+        if (monthIndex < 0 || monthIndex > 11) {
+          continue;
+        }
+        const value = typeof raw === 'number' ? raw : (raw as any)?.value;
+        if (typeof value === 'number' && !isNaN(value)) {
+          monthTotals[monthIndex] += value;
+          monthCounts[monthIndex] += 1;
+        }
+      }
+
+      const monthlyAverages = monthTotals.map((total, i) => (monthCounts[i] > 0 ? total / monthCounts[i] : 0));
+      this.cache.set(cacheKey, { data: monthlyAverages, timestamp: Date.now() });
+      return monthlyAverages;
+    } catch (error) {
+      console.error('Failed to fetch PVGIS typical baseline:', error);
+      return null;
+    }
   }
 
-  async fetchForecastSolarDataViaProxy(latitude: number, longitude: number, declination: number, azimuth: number, kwp: number, dataType: string = 'forecast', metric: string = 'watts', startDate?: string, endDate?: string): Promise<any> {
+  private getDaysInMonth(year: number, monthIndex: number): number {
+    return new Date(year, monthIndex + 1, 0).getDate();
+  }
+
+  // Adds a derived "percent_of_typical_day" / "percent_of_typical_month" series to allData,
+  // computed against the PVGIS climate-normal baseline for this exact system configuration.
+  private async addPercentOfTypicalData(allData: any, latitude: number, longitude: number, declination: number, azimuth: number, kwp: number, metric: string): Promise<void> {
+    // Prefer daily summaries (forecast); fall back to whatever raw Wh series is available
+    // (historical responses) and sum it up by calendar day ourselves, since granularity varies.
+    const sourceData: Record<string, number> = allData.watt_hours_day || allData.watt_hours || allData.watthours || allData.history_watthours || {};
+    const dailyData: Record<string, number> = {};
+    for (const [timestamp, value] of Object.entries(sourceData)) {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime()) || typeof value !== 'number') {
+        continue;
+      }
+      const dayKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      dailyData[dayKey] = (dailyData[dayKey] || 0) + value;
+    }
+
+    const baseline = await this.fetchPvgisMonthlyBaseline(latitude, longitude, declination, azimuth, kwp);
+    if (!baseline) {
+      allData[metric] = {};
+      return;
+    }
+
+    const result: Record<string, number> = {};
+
+    if (metric === 'percent_of_typical_day') {
+      for (const [dayKey, dayWh] of Object.entries(dailyData)) {
+        const date = new Date(dayKey);
+        if (isNaN(date.getTime())) {
+          continue;
+        }
+        const typicalMonthWh = baseline[date.getMonth()];
+        const typicalDayWh = typicalMonthWh / this.getDaysInMonth(date.getFullYear(), date.getMonth());
+        result[dayKey] = typicalDayWh > 0 ? (dayWh / typicalDayWh) * 100 : 0;
+      }
+    } else if (metric === 'percent_of_typical_month') {
+      // Sum forecasted/historical daily values by calendar month, then compare each
+      // month's total against its PVGIS typical baseline.
+      const monthTotals: Record<string, number> = {};
+      for (const [dayKey, dayWh] of Object.entries(dailyData)) {
+        const date = new Date(dayKey);
+        if (isNaN(date.getTime())) {
+          continue;
+        }
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
+        monthTotals[monthKey] = (monthTotals[monthKey] || 0) + dayWh;
+      }
+      for (const [monthKey, totalWh] of Object.entries(monthTotals)) {
+        const monthIndex = new Date(monthKey).getMonth();
+        const typicalMonthWh = baseline[monthIndex];
+        result[monthKey] = typicalMonthWh > 0 ? (totalWh / typicalMonthWh) * 100 : 0;
+      }
+    }
+
+    allData[metric] = result;
+  }
+
+  async fetchForecastSolarData(latitude: number, longitude: number, declination: number, azimuth: number, kwp: number, dataType: string = 'forecast', metric: string = 'watts', startDate?: string, endDate?: string, forecastDays?: number): Promise<any> {
+    // Use proxy route directly since direct API calls will fail due to CORS
+    return await this.fetchForecastSolarDataViaProxy(latitude, longitude, declination, azimuth, kwp, dataType, metric, startDate, endDate, forecastDays);
+  }
+
+  async fetchForecastSolarDataViaProxy(latitude: number, longitude: number, declination: number, azimuth: number, kwp: number, dataType: string = 'forecast', metric: string = 'watts', startDate?: string, endDate?: string, forecastDays?: number): Promise<any> {
     // For Forecast.Solar paid API, the URL format is: https://api.forecast.solar/YOUR_API_KEY/estimate/...
     // Since Grafana v7.33 doesn't support URL templating in proxy routes reliably,
     // we'll try the paid route first, and fall back to free if it fails
@@ -370,6 +507,9 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
       // Forecast data endpoints - always use the combined /estimate endpoint
       // This endpoint returns all four data objects: watts, watt_hours_period, watt_hours, watt_hours_day
       endpointPath = `/estimate/${latitude}/${longitude}/${declination}/${azimuth}/${kwp}`;
+      if (forecastDays) {
+        endpointPath += `?limit=${forecastDays}`;
+      }
     }
 
     let url = `/api/datasources/proxy/uid/${this.instanceSettings.uid}/${routePath}${endpointPath}`;

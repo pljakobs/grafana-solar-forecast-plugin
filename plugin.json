@@ -20,7 +20,7 @@
       {"name": "Apache License", "url": "https://github.com/pljakobs/grafana-solar-forecast-plugin/blob/main/LICENSE"}
     ],
     "screenshots": [],
-    "version": "1.0.4",
+    "version": "1.0.5",
     "updated": "2026-09-02"
   },
   "dependencies": {
@@ -51,6 +51,14 @@
       "headers": [
         {"name": "Accept", "content": "application/json"},
         {"name": "Authorization", "content": "Bearer {{ .SecureJsonData.apiKey }}"}
+      ]
+    },
+    {
+      "path": "pvgis",
+      "method": "*",
+      "url": "https://photovoltaic-geographic-information-system.ec.europa.eu/api/v6",
+      "headers": [
+        {"name": "Accept", "content": "application/json"}
       ]
     }
   ]
