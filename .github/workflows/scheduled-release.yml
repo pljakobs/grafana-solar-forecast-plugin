@@ -1,0 +1,84 @@
+name: Scheduled patch release
+
+# Bundles up accumulated dependency/patch-level changes into a release if
+# it's been 6+ months since the last release tag and there's anything new
+# to ship. Runs monthly; exits immediately if not due yet. Opens a normal
+# PR (version bump only) so it goes through the same CI gate as everything
+# else; the PR auto-merges once checks pass, and a follow-up workflow
+# (tag-scheduled-release.yml) creates the actual release tag after merge.
+
+on:
+  schedule:
+    - cron: '0 6 1 * *' # 06:00 UTC on the 1st of every month
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-and-open-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine if a scheduled release is due
+        id: check
+        run: |
+          last_tag=$(git tag --sort=-creatordate | head -n1)
+          if [ -z "$last_tag" ]; then
+            echo "No existing tags found; skipping scheduled release (initial release should be manual)."
+            echo "due=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          last_tag_date=$(git log -1 --format=%ct "$last_tag")
+          now=$(date +%s)
+          six_months_seconds=$((60*60*24*182))
+          age_seconds=$((now - last_tag_date))
+
+          commits_since=$(git rev-list "${last_tag}..HEAD" --count)
+
+          echo "Last tag: $last_tag (age: $((age_seconds / 86400)) days, commits since: $commits_since)"
+
+          if [ "$age_seconds" -ge "$six_months_seconds" ] && [ "$commits_since" -gt 0 ]; then
+            echo "due=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "due=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump patch version
+        if: steps.check.outputs.due == 'true'
+        id: bump
+        run: |
+          current_version=$(node -p "require('./package.json').version")
+          IFS='.' read -r major minor patch <<< "$current_version"
+          new_version="${major}.${minor}.$((patch + 1))"
+          echo "Bumping $current_version -> $new_version"
+
+          for f in package.json plugin.json src/plugin.json; do
+            sed -i "s/\"version\": \"$current_version\"/\"version\": \"$new_version\"/" "$f"
+          done
+
+          echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
+
+      - name: Open release PR
+        if: steps.check.outputs.due == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ steps.bump.outputs.new_version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          branch="release/scheduled-v${NEW_VERSION}"
+          git checkout -b "$branch"
+          git add package.json plugin.json src/plugin.json
+          git commit -m "chore(release): scheduled bundle release v${NEW_VERSION}"
+          git push origin "$branch"
+          pr_url=$(gh pr create --base main --head "$branch" \
+            --title "chore(release): scheduled bundle release v${NEW_VERSION}" \
+            --body "Automated scheduled release bundling accumulated dependency/patch-level updates since the last release (6+ month cadence with no manual release in between). Will auto-merge once CI passes; a release tag is created automatically after merge.")
+          gh pr merge --auto --squash "$pr_url"

@@ -1,0 +1,34 @@
+name: Tag scheduled release
+
+# Runs after a scheduled-release PR merges into main (commit message starts
+# with "chore(release): scheduled bundle release vX.Y.Z"). Creates and
+# pushes the version tag, which triggers the normal build-and-release
+# workflow to actually build and publish the GitHub Release.
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  tag-if-scheduled-release:
+    runs-on: ubuntu-latest
+    if: startsWith(github.event.head_commit.message, 'chore(release): scheduled bundle release v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version and tag
+        run: |
+          version=$(echo "${{ github.event.head_commit.message }}" | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+')
+          if [ -z "$version" ]; then
+            echo "Could not extract version from commit message; aborting."
+            exit 1
+          fi
+          echo "Tagging v${version}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${version}" -m "v${version}: scheduled bundle of accumulated dependency/patch updates"
+          git push origin "v${version}"
