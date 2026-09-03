@@ -1,15 +1,44 @@
 import { DataSourceJsonData } from '@grafana/data';
 import { DataQuery } from '@grafana/schema';
 
+export interface SolarString {
+  id: string;
+  name?: string;
+  declination: number;
+  azimuth: number;
+  kwp: number;
+}
+
 export interface SolarLocation {
   id: string;
   name: string;
   latitude: number;
   longitude: number;
-  declination: number;
-  azimuth: number;
-  kwp: number;
+  strings: SolarString[];
   description?: string;
+  // Deprecated single-string fields, kept only to migrate configs saved before multi-string support.
+  declination?: number;
+  azimuth?: number;
+  kwp?: number;
+}
+
+// Returns a location's strings, synthesizing one from legacy single-string fields when needed.
+export function getLocationStrings(location: SolarLocation): SolarString[] {
+  if (location.strings && location.strings.length > 0) {
+    return location.strings;
+  }
+  return [
+    {
+      id: 'legacy',
+      declination: location.declination ?? 30,
+      azimuth: location.azimuth ?? 180,
+      kwp: location.kwp ?? 5,
+    },
+  ];
+}
+
+export function getLocationTotalKwp(location: SolarLocation): number {
+  return getLocationStrings(location).reduce((sum, s) => sum + (s.kwp || 0), 0);
 }
 
 export interface MyQuery extends DataQuery {

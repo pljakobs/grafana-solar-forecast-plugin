@@ -1,7 +1,7 @@
 import React, { ChangeEvent, PureComponent } from 'react';
 import { LegacyForms } from '@grafana/ui';
 import { DataSourcePluginOptionsEditorProps } from '@grafana/data';
-import { MyDataSourceOptions, MySecureJsonData, SolarLocation } from './types';
+import { MyDataSourceOptions, MySecureJsonData, SolarLocation, SolarString, getLocationStrings, getLocationTotalKwp } from './types';
 
 const { SecretFormField, FormField } = LegacyForms;
 
@@ -25,9 +25,7 @@ export class ConfigEditor extends PureComponent<Props, State> {
         name: '',
         latitude: 51.13,
         longitude: 10.42,
-        declination: 30,
-        azimuth: 180,
-        kwp: 5.0,
+        strings: [this.createDefaultString()],
         description: '',
       },
     };
@@ -86,6 +84,18 @@ export class ConfigEditor extends PureComponent<Props, State> {
     return 'loc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   };
 
+  generateStringId = (): string => {
+    return 'str_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  };
+
+  createDefaultString = (): SolarString => ({
+    id: this.generateStringId(),
+    name: '',
+    declination: 30,
+    azimuth: 180,
+    kwp: 5.0,
+  });
+
   onAddLocation = () => {
     this.setState({
       showLocationModal: true,
@@ -94,9 +104,7 @@ export class ConfigEditor extends PureComponent<Props, State> {
         name: '',
         latitude: 51.13,
         longitude: 10.42,
-        declination: 30,
-        azimuth: 180,
-        kwp: 5.0,
+        strings: [this.createDefaultString()],
         description: '',
       },
     });
@@ -106,7 +114,7 @@ export class ConfigEditor extends PureComponent<Props, State> {
     this.setState({
       showLocationModal: true,
       editingLocation: location,
-      newLocation: { ...location },
+      newLocation: { ...location, strings: getLocationStrings(location) },
     });
   };
 
@@ -135,6 +143,10 @@ export class ConfigEditor extends PureComponent<Props, State> {
     
     if (!newLocation.name?.trim()) {
       alert('Please enter a location name');
+      return;
+    }
+    if (!newLocation.strings || newLocation.strings.length === 0) {
+      alert('Please add at least one string');
       return;
     }
 
@@ -187,6 +199,25 @@ export class ConfigEditor extends PureComponent<Props, State> {
     });
   };
 
+  onAddString = () => {
+    const strings = this.state.newLocation.strings || [];
+    this.setState({
+      newLocation: { ...this.state.newLocation, strings: [...strings, this.createDefaultString()] },
+    });
+  };
+
+  onRemoveString = (stringId: string) => {
+    const strings = (this.state.newLocation.strings || []).filter((s) => s.id !== stringId);
+    this.setState({ newLocation: { ...this.state.newLocation, strings } });
+  };
+
+  onStringFieldChange = (stringId: string, field: keyof SolarString, value: string | number) => {
+    const strings = (this.state.newLocation.strings || []).map((s) =>
+      s.id === stringId ? { ...s, [field]: value } : s
+    );
+    this.setState({ newLocation: { ...this.state.newLocation, strings } });
+  };
+
   onExportLocations = () => {
     const { options } = this.props as any;
     const locations: SolarLocation[] = options.jsonData.locations || [];
@@ -226,14 +257,13 @@ export class ConfigEditor extends PureComponent<Props, State> {
 
         const { onOptionsChange, options } = this.props as any;
         const currentLocations: SolarLocation[] = options.jsonData.locations || [];
-        // Regenerate ids to avoid collisions with existing locations
+        // Regenerate ids to avoid collisions with existing locations; migrate legacy
+        // single declination/azimuth/kwp exports into a one-string "strings" array.
         const importedLocations: SolarLocation[] = valid.map((loc) => ({
           name: loc.name!,
           latitude: loc.latitude!,
           longitude: loc.longitude!,
-          declination: loc.declination ?? 30,
-          azimuth: loc.azimuth ?? 180,
-          kwp: loc.kwp ?? 5,
+          strings: getLocationStrings(loc as SolarLocation).map((s) => ({ ...s, id: this.generateStringId() })),
           description: loc.description ?? '',
           id: this.generateLocationId(),
         }));
@@ -362,7 +392,12 @@ export class ConfigEditor extends PureComponent<Props, State> {
                         </div>
                       )}
                       <div style={{ fontSize: '11px', color: '#666' }}>
-                        {location.latitude}°N, {location.longitude}°E | {location.declination}° tilt, {location.azimuth}° azimuth | {location.kwp} kWp
+                        {location.latitude}°N, {location.longitude}°E | {getLocationStrings(location).length} string(s), {getLocationTotalKwp(location)} kWp total
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#666' }}>
+                        {getLocationStrings(location)
+                          .map((s, i) => `${s.name || 'String ' + (i + 1)}: ${s.declination}° tilt, ${s.azimuth}° azimuth, ${s.kwp} kWp`)
+                          .join(' | ')}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -478,37 +513,71 @@ export class ConfigEditor extends PureComponent<Props, State> {
                 />
               </div>
 
-              <div className="gf-form">
-                <FormField
-                  label="Tilt/Declination (°)"
-                  labelWidth={10}
-                  type="number"
-                  step="1"
-                  value={this.state.newLocation.declination || 0}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => this.onLocationFieldChange('declination', parseFloat(e.target.value))}
-                />
+              <h6 style={{ marginTop: '16px' }}>Strings</h6>
+              <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>
+                Add one entry per string of panels with a distinct tilt/azimuth/kWp (e.g. east + west roof faces).
               </div>
-
-              <div className="gf-form">
-                <FormField
-                  label="Azimuth (°)"
-                  labelWidth={10}
-                  type="number"
-                  step="1"
-                  value={this.state.newLocation.azimuth || 0}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => this.onLocationFieldChange('azimuth', parseFloat(e.target.value))}
-                />
-              </div>
-
-              <div className="gf-form">
-                <FormField
-                  label="Peak Power (kWp)"
-                  labelWidth={10}
-                  type="number"
-                  step="0.1"
-                  value={this.state.newLocation.kwp || 0}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => this.onLocationFieldChange('kwp', parseFloat(e.target.value))}
-                />
+              {(this.state.newLocation.strings || []).map((str, index) => (
+                <div
+                  key={str.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    gap: '8px',
+                    marginBottom: '8px',
+                    padding: '8px',
+                    border: '1px solid #333',
+                    borderRadius: '4px',
+                  }}
+                >
+                  <FormField
+                    label="Name"
+                    labelWidth={6}
+                    inputWidth={8}
+                    value={str.name || ''}
+                    placeholder={`String ${index + 1}`}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => this.onStringFieldChange(str.id, 'name', e.target.value)}
+                  />
+                  <FormField
+                    label="Tilt (°)"
+                    labelWidth={6}
+                    inputWidth={5}
+                    type="number"
+                    step="1"
+                    value={str.declination}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => this.onStringFieldChange(str.id, 'declination', parseFloat(e.target.value))}
+                  />
+                  <FormField
+                    label="Azimuth (°)"
+                    labelWidth={7}
+                    inputWidth={5}
+                    type="number"
+                    step="1"
+                    value={str.azimuth}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => this.onStringFieldChange(str.id, 'azimuth', parseFloat(e.target.value))}
+                  />
+                  <FormField
+                    label="kWp"
+                    labelWidth={5}
+                    inputWidth={5}
+                    type="number"
+                    step="0.1"
+                    value={str.kwp}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => this.onStringFieldChange(str.id, 'kwp', parseFloat(e.target.value))}
+                  />
+                  <button
+                    className="btn btn-danger btn-small"
+                    disabled={(this.state.newLocation.strings || []).length <= 1}
+                    onClick={() => this.onRemoveString(str.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <div className="gf-form" style={{ marginBottom: '16px' }}>
+                <button className="btn btn-secondary btn-small" onClick={this.onAddString}>
+                  Add String
+                </button>
               </div>
 
               <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>

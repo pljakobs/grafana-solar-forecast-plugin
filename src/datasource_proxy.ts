@@ -8,7 +8,7 @@ import {
 } from '@grafana/data';
 import { getBackendSrv } from '@grafana/runtime';
 
-import { MyQuery, MyDataSourceOptions, SolarLocation } from './types';
+import { MyQuery, MyDataSourceOptions, SolarLocation, SolarString, getLocationStrings } from './types';
 
 export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
   baseUrl: string;
@@ -50,12 +50,11 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
   async doRequest(query: MyQuery, from: number, to: number) {
     const { jsonData } = this.instanceSettings;
     
-    // Resolve location parameters - either from predefined location or custom values
+    // Resolve location parameters - either from predefined location (possibly multiple
+    // panel strings with their own tilt/azimuth/kWp) or a single custom-location string.
     let latitude: number;
     let longitude: number;
-    let declination: number;
-    let azimuth: number;
-    let kwp: number;
+    let strings: SolarString[];
 
     if (query.locationId && !query.useCustomLocation) {
       // Use predefined location
@@ -68,18 +67,14 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
       
       latitude = selectedLocation.latitude;
       longitude = selectedLocation.longitude;
-      declination = selectedLocation.declination;
-      azimuth = selectedLocation.azimuth;
-      kwp = selectedLocation.kwp;
+      strings = getLocationStrings(selectedLocation);
       
-      console.log(`📍 Using predefined location: ${selectedLocation.name} (${latitude}, ${longitude})`);
+      console.log(`📍 Using predefined location: ${selectedLocation.name} (${latitude}, ${longitude}), ${strings.length} string(s)`);
     } else {
-      // Use custom parameters with fallbacks to defaults
+      // Use custom parameters with fallbacks to defaults (always a single string)
       latitude = query.latitude || 51.13;
       longitude = query.longitude || 10.42;
-      declination = query.declination || 30;
-      azimuth = query.azimuth || 180;
-      kwp = query.kwp || 5.0;
+      strings = [{ id: 'custom', declination: query.declination || 30, azimuth: query.azimuth || 180, kwp: query.kwp || 5.0 }];
       
       console.log(`📍 Using custom location parameters: (${latitude}, ${longitude})`);
     }
@@ -98,8 +93,9 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     const startDate = query.startDate || (dataType === 'historical' ? rangeStartDate : undefined);
     const endDate = query.endDate || (dataType === 'historical' ? rangeEndDate : undefined);
     
-    // Create cache key based on all parameters
-    const cacheKey = this.getCacheKey(provider, latitude, longitude, declination, azimuth, kwp, solcastSiteId, dataType, metric, startDate, endDate, query.forecastPeriod, forecastDays);
+    // Create cache key based on all parameters (system signature covers every string)
+    const systemSignature = strings.map(s => `${s.declination}:${s.azimuth}:${s.kwp}`).join('|');
+    const cacheKey = this.getCacheKey(provider, latitude, longitude, systemSignature, solcastSiteId, dataType, metric, startDate, endDate, query.forecastPeriod, forecastDays);
     
     try {
       let allData: any;
@@ -132,11 +128,16 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
           if (provider === 'solcast') {
             allData = await this.fetchSolcastData(latitude, longitude, solcastSiteId, {});
           } else {
-            allData = await this.fetchForecastSolarData(latitude, longitude, declination, azimuth, kwp, dataType, fetchMetric, startDate, endDate, forecastDays);
+            // Fetch each panel string separately (Forecast.Solar has no concept of
+            // multiple planes per call) and sum the resulting series together.
+            const perStringData = await Promise.all(
+              strings.map(s => this.fetchForecastSolarData(latitude, longitude, s.declination, s.azimuth, s.kwp, dataType, fetchMetric, startDate, endDate, forecastDays))
+            );
+            allData = this.sumForecastSolarResults(perStringData);
           }
 
           if (isPercentOfTypical && provider !== 'solcast') {
-            await this.addPercentOfTypicalData(allData, latitude, longitude, declination, azimuth, kwp, metric);
+            await this.addPercentOfTypicalData(allData, latitude, longitude, strings, metric);
           }
           
           // Update last API call timestamp
@@ -276,9 +277,9 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     return parsed;
   }
 
-  private getCacheKey(provider: string, latitude: number, longitude: number, declination?: number, azimuth?: number, kwp?: number, solcastSiteId?: string, dataType?: string, metric?: string, startDate?: string, endDate?: string, forecastPeriod?: string, forecastDays?: number): string {
+  private getCacheKey(provider: string, latitude: number, longitude: number, systemSignature?: string, solcastSiteId?: string, dataType?: string, metric?: string, startDate?: string, endDate?: string, forecastPeriod?: string, forecastDays?: number): string {
     // Create a unique cache key based on configuration
-    return `${provider}-${latitude}-${longitude}-${declination}-${azimuth}-${kwp}-${solcastSiteId}-${dataType}-${metric}-${startDate}-${endDate}-${forecastPeriod}-${forecastDays}`;
+    return `${provider}-${latitude}-${longitude}-${systemSignature}-${solcastSiteId}-${dataType}-${metric}-${startDate}-${endDate}-${forecastPeriod}-${forecastDays}`;
   }
 
   private getEffectiveCacheTTL(provider: string, metric?: string): number {
@@ -367,8 +368,8 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
   }
 
   // Adds a derived "percent_of_typical_day" / "percent_of_typical_month" series to allData,
-  // computed against the PVGIS climate-normal baseline for this exact system configuration.
-  private async addPercentOfTypicalData(allData: any, latitude: number, longitude: number, declination: number, azimuth: number, kwp: number, metric: string): Promise<void> {
+  // computed against the PVGIS climate-normal baseline summed across all panel strings.
+  private async addPercentOfTypicalData(allData: any, latitude: number, longitude: number, strings: SolarString[], metric: string): Promise<void> {
     // Prefer daily summaries (forecast); fall back to whatever raw Wh series is available
     // (historical responses) and sum it up by calendar day ourselves, since granularity varies.
     const sourceData: Record<string, number> = allData.watt_hours_day || allData.watt_hours || allData.watthours || allData.history_watthours || {};
@@ -382,10 +383,16 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
       dailyData[dayKey] = (dailyData[dayKey] || 0) + value;
     }
 
-    const baseline = await this.fetchPvgisMonthlyBaseline(latitude, longitude, declination, azimuth, kwp);
-    if (!baseline) {
+    const perStringBaselines = await Promise.all(
+      strings.map(s => this.fetchPvgisMonthlyBaseline(latitude, longitude, s.declination, s.azimuth, s.kwp))
+    );
+    if (perStringBaselines.some(b => b === null)) {
       allData[metric] = {};
       return;
+    }
+    const baseline = new Array(12).fill(0);
+    for (const stringBaseline of perStringBaselines as number[][]) {
+      stringBaseline.forEach((value, i) => (baseline[i] += value));
     }
 
     const result: Record<string, number> = {};
@@ -420,6 +427,35 @@ export class DataSource extends DataSourceApi<MyQuery, MyDataSourceOptions> {
     }
 
     allData[metric] = result;
+  }
+
+  // Sums multiple per-string Forecast.Solar responses point-wise into a single combined result.
+  private sumForecastSolarResults(results: any[]): any {
+    if (results.length === 1) {
+      return results[0];
+    }
+    const combined: any = {};
+    const dataKeys = ['watts', 'watt_hours_period', 'watt_hours', 'watt_hours_day', 'watthours', 'history_watthours'];
+    for (const key of dataKeys) {
+      const merged: Record<string, number> = {};
+      let present = false;
+      for (const result of results) {
+        const series = result?.[key];
+        if (!series) {
+          continue;
+        }
+        present = true;
+        for (const [timestamp, value] of Object.entries(series)) {
+          if (typeof value === 'number') {
+            merged[timestamp] = (merged[timestamp] || 0) + value;
+          }
+        }
+      }
+      if (present) {
+        combined[key] = merged;
+      }
+    }
+    return combined;
   }
 
   async fetchForecastSolarData(latitude: number, longitude: number, declination: number, azimuth: number, kwp: number, dataType: string = 'forecast', metric: string = 'watts', startDate?: string, endDate?: string, forecastDays?: number): Promise<any> {

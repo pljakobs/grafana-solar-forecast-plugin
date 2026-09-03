@@ -2,7 +2,7 @@ import React, { ChangeEvent, PureComponent } from 'react';
 import { LegacyForms } from '@grafana/ui';
 import { QueryEditorProps } from '@grafana/data';
 import { DataSource } from './datasource_proxy';
-import { DEFAULT_QUERY, MyDataSourceOptions, MyQuery, METRIC_OPTIONS, DATA_TYPE_OPTIONS, FORECAST_PERIOD_OPTIONS, SolarLocation } from './types';
+import { DEFAULT_QUERY, MyDataSourceOptions, MyQuery, METRIC_OPTIONS, DATA_TYPE_OPTIONS, FORECAST_PERIOD_OPTIONS, SolarLocation, getLocationTotalKwp } from './types';
 
 const { FormField } = LegacyForms;
 
@@ -101,15 +101,15 @@ export class QueryEditor extends PureComponent<Props> {
       const selectedLocation = locations.find(loc => loc.id === selectedLocationId);
       
       if (selectedLocation) {
-        onChange({ 
-          ...query, 
+        onChange({
+          ...query,
           locationId: selectedLocationId,
           useCustomLocation: false,
           latitude: selectedLocation.latitude,
           longitude: selectedLocation.longitude,
-          declination: selectedLocation.declination,
-          azimuth: selectedLocation.azimuth,
-          kwp: selectedLocation.kwp
+          declination: undefined,
+          azimuth: undefined,
+          kwp: undefined,
         });
       }
     }
@@ -220,7 +220,7 @@ export class QueryEditor extends PureComponent<Props> {
                 <option value="">Select a location...</option>
                 {(datasource.getLocations() as SolarLocation[]).map(location => (
                   <option key={location.id} value={location.id}>
-                    {location.name} ({location.kwp} kWp)
+                    {location.name} ({getLocationTotalKwp(location)} kWp)
                   </option>
                 ))}
                 <option value="custom">🔧 Custom Parameters</option>
