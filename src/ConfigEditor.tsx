@@ -14,6 +14,8 @@ interface State {
 }
 
 export class ConfigEditor extends PureComponent<Props, State> {
+  private importFileInputRef = React.createRef<HTMLInputElement>();
+
   constructor(props: Props) {
     super(props);
     this.state = {
@@ -185,6 +187,71 @@ export class ConfigEditor extends PureComponent<Props, State> {
     });
   };
 
+  onExportLocations = () => {
+    const { options } = this.props as any;
+    const locations: SolarLocation[] = options.jsonData.locations || [];
+    const blob = new Blob([JSON.stringify(locations, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'solar-locations.json';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  onImportLocationsClick = () => {
+    this.importFileInputRef.current?.click();
+  };
+
+  onImportLocationsFileSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        const imported: Array<Partial<SolarLocation>> = Array.isArray(parsed) ? parsed : [parsed];
+        const valid = imported.filter(
+          (loc) => typeof loc.name === 'string' && typeof loc.latitude === 'number' && typeof loc.longitude === 'number'
+        );
+
+        if (valid.length === 0) {
+          alert('No valid locations found in the selected file.');
+          return;
+        }
+
+        const { onOptionsChange, options } = this.props as any;
+        const currentLocations: SolarLocation[] = options.jsonData.locations || [];
+        // Regenerate ids to avoid collisions with existing locations
+        const importedLocations: SolarLocation[] = valid.map((loc) => ({
+          name: loc.name!,
+          latitude: loc.latitude!,
+          longitude: loc.longitude!,
+          declination: loc.declination ?? 30,
+          azimuth: loc.azimuth ?? 180,
+          kwp: loc.kwp ?? 5,
+          description: loc.description ?? '',
+          id: this.generateLocationId(),
+        }));
+
+        onOptionsChange({
+          ...options,
+          jsonData: {
+            ...options.jsonData,
+            locations: [...currentLocations, ...importedLocations],
+          },
+        });
+      } catch (e) {
+        alert('Failed to parse locations file: ' + (e instanceof Error ? e.message : 'Invalid JSON'));
+      }
+    };
+    reader.readAsText(file);
+  };
+
   render() {
     const { options } = this.props as any;
     const { jsonData, secureJsonFields } = options;
@@ -237,11 +304,29 @@ export class ConfigEditor extends PureComponent<Props, State> {
             </div>
           </div>
           
-          {/* Add Location Button */}
-          <div className="gf-form">
+          {/* Add / Export / Import Location Buttons */}
+          <div className="gf-form" style={{ gap: '8px' }}>
             <button className="btn btn-primary" onClick={this.onAddLocation}>
               Add Location
             </button>
+            <button
+              className="btn btn-secondary"
+              style={{ marginLeft: '8px' }}
+              onClick={this.onExportLocations}
+              disabled={(jsonData.locations || []).length === 0}
+            >
+              Export Locations
+            </button>
+            <button className="btn btn-secondary" style={{ marginLeft: '8px' }} onClick={this.onImportLocationsClick}>
+              Import Locations
+            </button>
+            <input
+              type="file"
+              accept="application/json"
+              ref={this.importFileInputRef}
+              style={{ display: 'none' }}
+              onChange={this.onImportLocationsFileSelected}
+            />
           </div>
           
           {/* Location List */}
